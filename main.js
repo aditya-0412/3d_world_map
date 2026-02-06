@@ -160,7 +160,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.domElement.style.touchAction = "none";
 document.body.appendChild(renderer.domElement);
 
 // ================= CONTROLS =================
@@ -435,26 +434,11 @@ function hideTooltip() {
   tooltip.classList.remove("visible");
 }
 
-function updatePointer(e) {
-  const x = e.touches ? e.touches[0].pageX : e.pageX;
-  const y = e.touches ? e.touches[0].pageY : e.pageY;
-
-  tooltip.style.left = `${x}px`;
-  tooltip.style.top = `${y}px`;
-
-  // Update raycaster mouse coords
-  mouse.x = (x / window.innerWidth) * 2 - 1;
-  mouse.y = -(y / window.innerHeight) * 2 + 1;
-
+window.addEventListener("mousemove", (e) => {
+  tooltip.style.left = `${e.pageX}px`;
+  tooltip.style.top = `${e.pageY}px`;
   handleHotspots(false);
-}
-
-// Pointer events (modern)
-window.addEventListener("pointermove", updatePointer, { passive: true });
-
-// Touch fallback (older Safari safety)
-window.addEventListener("touchmove", updatePointer, { passive: true });
-
+});
 
 window.addEventListener("click", () => {
   handleHotspots(true);
