@@ -459,10 +459,10 @@ function updatePointer(e) {
 
 
 // Pointer events (modern)
-window.addEventListener("pointermove", updatePointer, { passive: true });
+window.addEventListener("pointermove", updatePointer);
 
 // Touch fallback (older Safari safety)
-window.addEventListener("touchmove", updatePointer, { passive: true });
+window.addEventListener("touchmove", updatePointer);
 
 
 window.addEventListener("click", () => {
