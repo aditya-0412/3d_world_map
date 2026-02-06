@@ -160,6 +160,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.domElement.style.touchAction = "none";
 document.body.appendChild(renderer.domElement);
 
 // ================= CONTROLS =================
@@ -430,18 +431,32 @@ function hideTooltip() {
 }
 
 function updatePointer(e) {
-  const x = e.touches ? e.touches[0].pageX : e.pageX;
-  const y = e.touches ? e.touches[0].pageY : e.pageY;
+  let x, y;
+
+  if (e.touches && e.touches.length) {
+    x = e.touches[0].clientX;
+    y = e.touches[0].clientY;
+  } else {
+    x = e.clientX;
+    y = e.clientY;
+  }
+
+  // iOS Safari viewport correction
+  if (window.visualViewport) {
+    x += window.visualViewport.offsetLeft;
+    y += window.visualViewport.offsetTop;
+  }
 
   tooltip.style.left = `${x}px`;
   tooltip.style.top = `${y}px`;
 
-  // Update raycaster mouse coords
+  // Raycaster coords MUST stay layout-based
   mouse.x = (x / window.innerWidth) * 2 - 1;
   mouse.y = -(y / window.innerHeight) * 2 + 1;
 
   handleHotspots(false);
 }
+
 
 // Pointer events (modern)
 window.addEventListener("pointermove", updatePointer, { passive: true });
