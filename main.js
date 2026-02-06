@@ -433,10 +433,6 @@ function handleHotspots(isClick = false) {
   raycaster.setFromCamera(mouse, camera);
   const hits = raycaster.intersectObject(hotspotMesh);
 
-  // if (!hits.length) {
-  //   if (!isClick) hideTooltip();
-  //   return;
-  // }
   if (!hits.length) {
     hideTooltip();
     return;
@@ -464,10 +460,6 @@ function hideTooltip() {
   activeHotspot = null;
   tooltip.classList.remove("visible");
 }
-
-// window.addEventListener("click", () => {
-//   handleHotspots(true);
-// });
 
 function smoothLiftUpdate() {
   if (!dotMesh) return;
