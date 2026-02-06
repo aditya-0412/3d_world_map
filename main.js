@@ -361,11 +361,6 @@ let hotspotData = [];
 let hoveredInstanceId = null;
 let hoverCooldown = 0;
 
-window.addEventListener("mousemove", (e) => {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-});
-
 function handleHover() {
   if (!dotMesh) return;
 
@@ -408,18 +403,54 @@ function handleHover() {
 let activeHotspot = null;
 const tooltip = document.getElementById("tooltip");
 
+window.addEventListener("pointermove", (e) => {
+  // Update tooltip position (viewport-safe)
+  tooltip.style.left = `${e.clientX}px`;
+  tooltip.style.top = `${e.clientY}px`;
+
+  // Update normalized device coords for raycasting
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  handleHotspots(false);
+});
+
+window.addEventListener("pointerdown", (e) => {
+  // Update mouse coords immediately on tap
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  // Position tooltip at tap point
+  tooltip.style.left = `${e.clientX}px`;
+  tooltip.style.top = `${e.clientY}px`;
+
+  handleHotspots(true);
+});
+
 function handleHotspots(isClick = false) {
   if (!hotspotMesh) return;
 
   raycaster.setFromCamera(mouse, camera);
   const hits = raycaster.intersectObject(hotspotMesh);
 
+  // if (!hits.length) {
+  //   if (!isClick) hideTooltip();
+  //   return;
+  // }
   if (!hits.length) {
-    if (!isClick) hideTooltip();
+    hideTooltip();
     return;
   }
 
-  showTooltip(hotspotData[hits[0].instanceId]);
+   const hs = hotspotData[hits[0].instanceId];
+
+  // Toggle on mobile tap
+  if (isClick && activeHotspot === hs) {
+    hideTooltip();
+    return;
+  }
+
+  showTooltip(hs);
 }
 
 function showTooltip(hs) {
@@ -434,15 +465,9 @@ function hideTooltip() {
   tooltip.classList.remove("visible");
 }
 
-window.addEventListener("mousemove", (e) => {
-  tooltip.style.left = `${e.pageX}px`;
-  tooltip.style.top = `${e.pageY}px`;
-  handleHotspots(false);
-});
-
-window.addEventListener("click", () => {
-  handleHotspots(true);
-});
+// window.addEventListener("click", () => {
+//   handleHotspots(true);
+// });
 
 function smoothLiftUpdate() {
   if (!dotMesh) return;

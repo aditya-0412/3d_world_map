@@ -30,7 +30,7 @@
         }
 
         .map-tooltip {
-            position: absolute;
+            position: fixed;
             background: #1f232e;
             color: #ffffff;
             padding: 14px 16px;
@@ -40,7 +40,10 @@
             max-width: 280px;
             line-height: 1.4;
             pointer-events: none;
+
             opacity: 0;
+            visibility: hidden;
+
             transform: translate3d(-50%, -110%, 0);
             will-change: transform, opacity;
             transition: opacity 0.2s ease, transform 0.2s ease;
@@ -50,6 +53,7 @@
 
         .map-tooltip.visible {
             opacity: 1;
+            visibility: visible;
             transform: translate3d(-50%, -130%, 0);
         }
     </style>
