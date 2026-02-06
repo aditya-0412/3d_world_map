@@ -362,6 +362,11 @@ let hotspotData = [];
 let hoveredInstanceId = null;
 let hoverCooldown = 0;
 
+window.addEventListener("mousemove", (e) => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
 function handleHover() {
   if (!dotMesh) return;
 
@@ -431,38 +436,24 @@ function hideTooltip() {
 }
 
 function updatePointer(e) {
-  let x, y;
-
-  if (e.touches && e.touches.length) {
-    x = e.touches[0].clientX;
-    y = e.touches[0].clientY;
-  } else {
-    x = e.clientX;
-    y = e.clientY;
-  }
-
-  // iOS Safari viewport correction
-  if (window.visualViewport) {
-    x += window.visualViewport.offsetLeft;
-    y += window.visualViewport.offsetTop;
-  }
+  const x = e.touches ? e.touches[0].pageX : e.pageX;
+  const y = e.touches ? e.touches[0].pageY : e.pageY;
 
   tooltip.style.left = `${x}px`;
   tooltip.style.top = `${y}px`;
 
-  // Raycaster coords MUST stay layout-based
+  // Update raycaster mouse coords
   mouse.x = (x / window.innerWidth) * 2 - 1;
   mouse.y = -(y / window.innerHeight) * 2 + 1;
 
   handleHotspots(false);
 }
 
-
 // Pointer events (modern)
-window.addEventListener("pointermove", updatePointer);
+window.addEventListener("pointermove", updatePointer, { passive: true });
 
 // Touch fallback (older Safari safety)
-window.addEventListener("touchmove", updatePointer);
+window.addEventListener("touchmove", updatePointer, { passive: true });
 
 
 window.addEventListener("click", () => {
