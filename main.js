@@ -51,8 +51,8 @@ const CONFIG = {
   },
 
   hover: {
-    radius: 0.3,
-    maxLift: 0.45,
+    radius: 0.35,
+    maxLift: 0.55,
     easing: 0.12,
     threshold: 0.001,
   },
@@ -65,16 +65,16 @@ const HOTSPOTS = [
     label: "Cheltenham Master POP",
     message:
       "Fully operational\nServing EMEA Region\nPOP capacity: 800,000 DAU (@5% concurrency 40,000 users)",
-    lat: 78.8994,
-    lon: 0.0783,
+    lat: 79.8994,
+    lon: -5.0783,
   },
   {
     id: "cheltenham-ai",
     label: "Cheltenham AI Node",
     message:
       "In test operation\nServing Worldwide\nNode capacity: 1,000,000 DAU (@1% concurrency 10,000 users)",
-    lat: 80.8994,
-    lon: 5.0783,
+    lat: 80.5456,
+    lon: 1.0783,
   },
   {
     id: "ljubljana",
@@ -438,7 +438,7 @@ function handleHotspots(isClick = false) {
     return;
   }
 
-   const hs = hotspotData[hits[0].instanceId];
+  const hs = hotspotData[hits[0].instanceId];
 
   // Toggle on mobile tap
   if (isClick && activeHotspot === hs) {
