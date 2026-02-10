@@ -29,10 +29,12 @@ const CONFIG = {
 
   lighting: {
     ambientIntensity: 0.7,
+
     directional: {
-      intensity: 0.9,
-      position: { x: -10, y: 20, z: -10 },
+      intensity: 1.5,
+      position: { x: -15, y: 25, z: -10 },
       castShadow: true,
+
       shadow: {
         mapSize: 5024, // Adjust for cylinder Shadow sharpness
         near: 1,
@@ -41,6 +43,18 @@ const CONFIG = {
         opacity: 0.2,
       },
     },
+
+    // Soft top highlight (gives bright dot caps)
+    topLight: {
+      intensity: 0.65,
+      position: { x: 0, y: 1, z: 0 },
+    },
+  },
+
+  interaction: {
+    raycastThresholdMultiplier: 1.2,
+    hoverCooldownFrames: 4, // frames to lock hover after change (prevents flicker)
+    hoverFalloff: 0.92, // decay factor for hover lift (instead of instant reset)
   },
 
   dots: {
@@ -48,6 +62,27 @@ const CONFIG = {
     height: 0.3,
     color: 0x7ae0ff,
     spacing: 1.5, // (1.0 = original)
+    material: {
+      roughness: 0.55,
+      metalness: 0.0,
+    },
+  },
+
+  dotGeometry: {
+    radialSegments: 24,
+    heightMultiplier: 1.15,
+    topRadiusFactor: 0.98,
+  },
+
+  hotspots: {
+    radiusMultiplier: 1.5,
+    heightMultiplier: 1.8,
+    radialSegments: 30,
+
+    material: {
+      roughness: 0.3,
+      metalness: 0.0,
+    },
   },
 
   hover: {
@@ -59,64 +94,18 @@ const CONFIG = {
 };
 
 // ================= HOTSPOTS =================
-const HOTSPOTS = [
-  {
-    id: "cheltenham-master",
-    label: "Cheltenham Master POP",
-    message:
-      "Fully operational\nServing EMEA Region\nPOP capacity: 800,000 DAU (@5% concurrency 40,000 users)",
-    lat: 79.8994,
-    lon: -5.0783,
-  },
-  {
-    id: "cheltenham-ai",
-    label: "Cheltenham AI Node",
-    message:
-      "In test operation\nServing Worldwide\nNode capacity: 1,000,000 DAU (@1% concurrency 10,000 users)",
-    lat: 80.5456,
-    lon: 1.0783,
-  },
-  {
-    id: "ljubljana",
-    label: "Ljubljana POP",
-    message:
-      "Fully operational\nServing Central and Eastern Europe\nPOP capacity: 400,000 DAU (@5% concurrency 20,000 users)",
-    lat: 70.0569,
-    lon: 35.5058,
-  },
-  {
-    id: "angola",
-    label: "Angola POP",
-    message:
-      "Fully operational\nServing Africell subscribers nationwide\nPOP capacity: 400,000 DAU (@5% concurrency 20,000 users)",
-    lat: -8.839,
-    lon: 13.2894,
-  },
-  {
-    id: "johannesburg",
-    label: "Johannesburg POP",
-    message:
-      "To be operational in March 2026\nServing sub-Saharan Africa\nPOP capacity: 400,000 DAU (@5% concurrency 20,000 users)",
-    lat: -38.2041,
-    lon: 45.0473,
-  },
-  {
-    id: "miami",
-    label: "Miami POP",
-    message:
-      "To be operational in March 2026\nServing North and South America\nPOP capacity: 600,000 DAU (@5% concurrency 30,000 users)",
-    lat: 40.7617,
-    lon: -121.1918,
-  },
-  {
-    id: "singapore",
-    label: "Singapore POP",
-    message:
-      "To be operational in March 2026\nServing Eastern Hemisphere from India to Oceania\nPOP capacity: 400,000 DAU (@5% concurrency 20,000 users)",
-    lat: 1.3521,
-    lon: 152.8198,
-  },
-];
+const HOTSPOT_COLORS = {
+  global: 0x008551, // traffic light green
+  regional: 0xff8a00, // orange
+  telco: 0xff4fa3, // pink
+};
+
+const HOTSPOTS = [];
+async function loadHotspots(type, url) {
+  return fetch(url)
+    .then((res) => res.json())
+    .then((data) => data.map((h) => ({ ...h, type })));
+}
 
 // Map hotspots
 function latLonToMapXY(lat, lon, mapWidth = 20, mapHeight = 10) {
@@ -200,8 +189,6 @@ dir.shadow.camera.left = -dCfg.shadow.bounds;
 dir.shadow.camera.right = dCfg.shadow.bounds;
 dir.shadow.camera.top = dCfg.shadow.bounds;
 dir.shadow.camera.bottom = -dCfg.shadow.bounds;
-dir.intensity = 1.5;
-dir.position.set(-15, 25, -10);
 
 scene.add(dir);
 
@@ -215,8 +202,16 @@ shadowPlane.receiveShadow = true;
 scene.add(shadowPlane);
 
 // Soft top highlight (gives bright dot caps)
-const topLight = new THREE.DirectionalLight(0xffffff, 0.65);
-topLight.position.set(0, 40, 10);
+const topLight = new THREE.DirectionalLight(
+  0xffffff,
+  CONFIG.lighting.topLight.intensity,
+);
+topLight.position.set(
+  CONFIG.lighting.topLight.position.x,
+  CONFIG.lighting.topLight.position.y,
+  CONFIG.lighting.topLight.position.z,
+);
+
 topLight.castShadow = false;
 scene.add(topLight);
 
@@ -233,28 +228,38 @@ let dotMesh = null;
 let dotPositions = [];
 
 const raycaster = new THREE.Raycaster();
-raycaster.params.InstancedMesh = { threshold: DOT_RADIUS * 1.2 };
+raycaster.params.InstancedMesh = {
+  threshold: DOT_RADIUS * CONFIG.interaction.raycastThresholdMultiplier,
+};
 const mouse = new THREE.Vector2();
 
-fetch("dots.json")
-  .then((res) => res.json())
-  .then(buildDotsFromFile);
+Promise.all([
+  loadHotspots("global", "global-hotspots.json"),
+  loadHotspots("regional", "regional-hotspots.json"),
+  loadHotspots("telco", "telco-hotspots.json"),
+]).then(([global, regional, telco]) => {
+  HOTSPOTS.push(...global, ...regional, ...telco);
+
+  // Now safe to build dots
+  fetch("dots.json")
+    .then((res) => res.json())
+    .then(buildDotsFromFile);
+});
 
 function buildDotsFromFile(dots) {
   const geometry = new THREE.CylinderGeometry(
-    DOT_RADIUS * 0.98,
+    DOT_RADIUS * CONFIG.dotGeometry.topRadiusFactor,
     DOT_RADIUS,
-    DOT_HEIGHT * 1.15,
-    24,
+    DOT_HEIGHT * CONFIG.dotGeometry.heightMultiplier,
+    CONFIG.dotGeometry.radialSegments,
     1,
     false,
   );
 
   const material = new THREE.MeshStandardMaterial({
     color: DOT_COLOR,
-    roughness: 0.55,
-    metalness: 0.0,
-    envMapIntensity: 0.0,
+    roughness: CONFIG.dots.material.roughness,
+    metalness: CONFIG.dots.material.metalness,
     flatShading: false,
   });
 
@@ -281,79 +286,97 @@ function buildDotsFromFile(dots) {
   dotMesh.castShadow = true;
 
   scene.add(dotMesh);
-  // --- Build hotspot dots ---
+  // --- Build hotspot dots (BY TYPE) ---
   const hotspotGeometry = new THREE.CylinderGeometry(
-    CONFIG.dots.radius * 1.5,
-    CONFIG.dots.radius * 1.5,
-    CONFIG.dots.height * 1.8,
+    CONFIG.dots.radius * CONFIG.hotspots.radiusMultiplier,
+    CONFIG.dots.radius * CONFIG.hotspots.radiusMultiplier,
+    CONFIG.dots.height * CONFIG.hotspots.heightMultiplier,
+    CONFIG.hotspots.radialSegments,
   );
 
-  const hotspotMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe62929, // Hotspot color - RED Shaded
+  // Group hotspots by type
+  const grouped = {};
+  HOTSPOTS.forEach((hs) => {
+    grouped[hs.type] ??= [];
+    grouped[hs.type].push(hs);
   });
 
-  hotspotMesh = new THREE.InstancedMesh(
-    hotspotGeometry,
-    hotspotMaterial,
-    HOTSPOTS.length,
-  );
-
-  const dummy2 = new THREE.Object3D();
-
-  // Find nearest dot for each hotspot
-  HOTSPOTS.forEach((hs, i) => {
-    const { x, y } = latLonToMapXY(hs.lat, hs.lon);
-
-    let bestIndex = -1;
-    let bestDist = Infinity;
-
-    dotPositions.forEach((p, idx) => {
-      const dx = p.x - x;
-      const dy = p.y - y;
-      const d = dx * dx + dy * dy;
-
-      if (d < bestDist) {
-        bestDist = d;
-        bestIndex = idx;
-      }
+  Object.entries(grouped).forEach(([type, list]) => {
+    const material = new THREE.MeshStandardMaterial({
+      color: HOTSPOT_COLORS[type] ?? HOTSPOT_COLORS.default,
+      roughness: CONFIG.hotspots.material.roughness,
+      metalness: CONFIG.hotspots.material.metalness,
     });
 
-    dotPositions[bestIndex].isHotspot = true;
-    dotPositions[bestIndex].hotspotIndex = i;
+    const mesh = new THREE.InstancedMesh(
+      hotspotGeometry,
+      material,
+      list.length,
+    );
 
-    hotspotData[i] = { ...hs, dotIndex: bestIndex };
+    // IMPORTANT: store type on mesh (used for raycasting)
+    mesh.userData.type = type;
 
-    const p = dotPositions[bestIndex];
-    dummy2.position.set(p.x * SPACING, CONFIG.dots.height / 2, -p.y * SPACING);
-    dummy2.updateMatrix();
-    hotspotMesh.setMatrixAt(i, dummy2.matrix);
+    const dummy = new THREE.Object3D();
+
+    list.forEach((hs, i) => {
+      const { x, y } = latLonToMapXY(hs.lat, hs.lon);
+
+      let bestIndex = -1;
+      let bestDist = Infinity;
+
+      dotPositions.forEach((p, idx) => {
+        const dx = p.x - x;
+        const dy = p.y - y;
+        const d = dx * dx + dy * dy;
+        if (d < bestDist) {
+          bestDist = d;
+          bestIndex = idx;
+        }
+      });
+
+      dotPositions[bestIndex].isHotspot = true;
+      dotPositions[bestIndex].hotspotIndex = hotspotData.length;
+
+      hotspotData.push({
+        ...hs,
+        dotIndex: bestIndex,
+        meshType: type,
+        meshInstanceId: i,
+      });
+
+      const p = dotPositions[bestIndex];
+      dummy.position.set(p.x * SPACING, CONFIG.dots.height / 2, -p.y * SPACING);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.frustumCulled = false;
+    mesh.castShadow = true;
+
+    hotspotMeshes[type] = mesh;
+    scene.add(mesh);
   });
-
-  hotspotMesh.instanceMatrix.needsUpdate = true;
-  hotspotMesh.frustumCulled = false;
-  hotspotMesh.castShadow = true;
-
-  scene.add(hotspotMesh);
 }
 
 function syncHotspotLift() {
-  if (!hotspotMesh) return;
-
   const dummy = new THREE.Object3D();
 
-  hotspotData.forEach((hs, i) => {
+  hotspotData.forEach((hs) => {
     const p = dotPositions[hs.dotIndex];
+    const mesh = hotspotMeshes[hs.meshType];
 
     dummy.position.set(p.x * SPACING, DOT_HEIGHT / 2 + p.lift, -p.y * SPACING);
     dummy.updateMatrix();
-    hotspotMesh.setMatrixAt(i, dummy.matrix);
-  });
 
-  hotspotMesh.instanceMatrix.needsUpdate = true;
+    mesh.setMatrixAt(hs.meshInstanceId, dummy.matrix);
+    mesh.instanceMatrix.needsUpdate = true;
+  });
 }
 
 // ================= HOTSPOT DOTS =================
-let hotspotMesh = null;
+let hotspotMeshes = {};
 let hotspotData = [];
 
 // ================= HOVER =================
@@ -373,7 +396,7 @@ function handleHover() {
 
     if (hoveredInstanceId !== id) {
       hoveredInstanceId = id;
-      hoverCooldown = 4; // frames to lock
+      hoverCooldown = CONFIG.interaction.hoverCooldownFrames;
     }
   } else if (hoverCooldown <= 0) {
     hoveredInstanceId = null;
@@ -428,25 +451,31 @@ window.addEventListener("pointerdown", (e) => {
 });
 
 function handleHotspots(isClick = false) {
-  if (!hotspotMesh) return;
-
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObject(hotspotMesh);
 
-  if (!hits.length) {
-    hideTooltip();
+  for (const mesh of Object.values(hotspotMeshes)) {
+    const hits = raycaster.intersectObject(mesh);
+    if (!hits.length) continue;
+
+    const instanceId = hits[0].instanceId;
+    const hs =
+      hotspotData.find(
+        (h) =>
+          h.meshType === mesh.userData?.type && h.meshInstanceId === instanceId,
+      ) || hotspotData.find((h) => h.meshInstanceId === instanceId);
+
+    if (!hs) continue;
+
+    if (isClick && activeHotspot === hs) {
+      hideTooltip();
+      return;
+    }
+
+    showTooltip(hs);
     return;
   }
 
-  const hs = hotspotData[hits[0].instanceId];
-
-  // Toggle on mobile tap
-  if (isClick && activeHotspot === hs) {
-    hideTooltip();
-    return;
-  }
-
-  showTooltip(hs);
+  hideTooltip();
 }
 
 function showTooltip(hs) {
@@ -469,7 +498,7 @@ function smoothLiftUpdate() {
   let dirty = false;
 
   dotPositions.forEach((p, i) => {
-    p.targetLift *= 0.92; // decay instead of reset
+    p.targetLift *= CONFIG.interaction.hoverFalloff;
 
     const delta = p.targetLift - p.lift;
     if (Math.abs(delta) > threshold) {

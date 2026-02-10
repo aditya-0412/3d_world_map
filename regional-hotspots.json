@@ -1,0 +1,30 @@
+[
+  {
+    "id": "ljubljana",
+    "label": "Ljubljana POP",
+    "message": "Fully operational\nServing Central and Eastern Europe\nPOP capacity: 400,000 DAU (@5% concurrency 20,000 users)",
+    "lat": 70.0569,
+    "lon": 35.5058
+  },
+  {
+    "id": "miami",
+    "label": "Miami POP",
+    "message": "To be operational in March 2026\nServing North and South America\nPOP capacity: 600,000 DAU (@5% concurrency 30,000 users)",
+    "lat": 40.7617,
+    "lon": -121.1918
+  },
+  {
+    "id": "singapore",
+    "label": "Singapore POP",
+    "message": "To be operational in March 2026\nServing Eastern Hemisphere from India to Oceania\nPOP capacity: 400,000 DAU (@5% concurrency 20,000 users)",
+    "lat": 1.3521,
+    "lon": 152.8198
+  },
+  {
+    "id": "cheltenham-master",
+    "label": "Cheltenham Master POP",
+    "message": "Fully operational\nServing EMEA Region\nPOP capacity: 800,000 DAU (@5% concurrency 40,000 users)",
+    "lat": 79.8994,
+    "lon": -5.0783
+  }
+]
