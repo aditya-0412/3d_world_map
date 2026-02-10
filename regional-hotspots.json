@@ -26,5 +26,40 @@
     "message": "Fully operational\nServing EMEA Region\nPOP capacity: 800,000 DAU (@5% concurrency 40,000 users)",
     "lat": 79.8994,
     "lon": -5.0783
+  },
+  {
+    "id": "los-angeles",
+    "label": "Los Angeles POP",
+    "message": "Fully operational\nServing North America\nPOP capacity: 600,000 DAU (@5% concurrency 30,000 users)",
+    "lat": 20.0522,
+    "lon": -218.2437
+  },
+  {
+    "id": "dallas",
+    "label": "Dallas POP",
+    "message": "Fully operational\nServing North America\nPOP capacity: 600,000 DAU (@5% concurrency 30,000 users)",
+    "lat": 55.7765,
+    "lon": -145.7969
+  },
+  {
+    "id": "atlanta",
+    "label": "Atlanta POP",
+    "message": "Fully operational\nServing North America\nPOP capacity: 600,000 DAU (@5% concurrency 30,000 users)",
+    "lat": 60.7765,
+    "lon": -125.7969
+  },
+  {
+    "id": "new-jersey",
+    "label": "New Jersey POP",
+    "message": "Fully operational\nServing North America\nPOP capacity: 600,000 DAU (@5% concurrency 30,000 users)",
+    "lat": 72.7765,
+    "lon": -99.7969
+  },
+  {
+    "id": "omaha",
+    "label": "Omaha POP",
+    "message": "Fully operational\nServing North America\nPOP capacity: 600,000 DAU (@5% concurrency 30,000 users)",
+    "lat": 76.7765,
+    "lon": -140.7969
   }
 ]

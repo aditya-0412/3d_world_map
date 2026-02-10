@@ -28,7 +28,7 @@ const CONFIG = {
   },
 
   lighting: {
-    ambientIntensity: 0.7,
+    ambientIntensity: 0.45,
 
     directional: {
       intensity: 1.5,
@@ -46,13 +46,12 @@ const CONFIG = {
 
     // Soft top highlight (gives bright dot caps)
     topLight: {
-      intensity: 0.65,
-      position: { x: 0, y: 1, z: 0 },
+      intensity: 1.1,
+      position: { x: 0, y: 12, z: 6 },
     },
   },
 
   interaction: {
-    raycastThresholdMultiplier: 1.2,
     hoverCooldownFrames: 4, // frames to lock hover after change (prevents flicker)
     hoverFalloff: 0.92, // decay factor for hover lift (instead of instant reset)
   },
@@ -69,19 +68,19 @@ const CONFIG = {
   },
 
   dotGeometry: {
-    radialSegments: 24,
+    radialSegments: 32,
     heightMultiplier: 1.15,
     topRadiusFactor: 0.98,
   },
 
   hotspots: {
-    radiusMultiplier: 1.5,
-    heightMultiplier: 1.8,
+    radiusMultiplier: 1.9,
+    heightMultiplier: 2.2,
     radialSegments: 30,
 
     material: {
       roughness: 0.3,
-      metalness: 0.0,
+      metalness: 0.01,
     },
   },
 
@@ -92,6 +91,14 @@ const CONFIG = {
     threshold: 0.001,
   },
 };
+
+// ================= CONSTANTS =================
+const GROUND_Y = 0;
+const DOT_BASE_Y = GROUND_Y; // exact contact point
+
+function getCylinderCenterY(height, lift = 0) {
+  return DOT_BASE_Y + height / 2 + lift;
+}
 
 // ================= HOTSPOTS =================
 const HOTSPOT_COLORS = {
@@ -189,6 +196,8 @@ dir.shadow.camera.left = -dCfg.shadow.bounds;
 dir.shadow.camera.right = dCfg.shadow.bounds;
 dir.shadow.camera.top = dCfg.shadow.bounds;
 dir.shadow.camera.bottom = -dCfg.shadow.bounds;
+dir.shadow.bias = -0.0006;
+dir.shadow.normalBias = 0.02;
 
 scene.add(dir);
 
@@ -198,6 +207,7 @@ const shadowPlane = new THREE.Mesh(
   new THREE.ShadowMaterial({ opacity: dCfg.shadow.opacity }),
 );
 shadowPlane.rotation.x = -Math.PI / 2;
+shadowPlane.position.y = GROUND_Y;
 shadowPlane.receiveShadow = true;
 scene.add(shadowPlane);
 
@@ -211,8 +221,9 @@ topLight.position.set(
   CONFIG.lighting.topLight.position.y,
   CONFIG.lighting.topLight.position.z,
 );
+topLight.target.position.set(0, 0, 0);
+scene.add(topLight.target);
 
-topLight.castShadow = false;
 scene.add(topLight);
 
 // ================= DOTS =================
@@ -228,9 +239,6 @@ let dotMesh = null;
 let dotPositions = [];
 
 const raycaster = new THREE.Raycaster();
-raycaster.params.InstancedMesh = {
-  threshold: DOT_RADIUS * CONFIG.interaction.raycastThresholdMultiplier,
-};
 const mouse = new THREE.Vector2();
 
 Promise.all([
@@ -245,8 +253,29 @@ Promise.all([
     .then((res) => res.json())
     .then(buildDotsFromFile);
 });
+let hoverProxyMesh = null;
 
 function buildDotsFromFile(dots) {
+  // --- create proxy FIRST ---
+
+  const hoverProxyGeometry = new THREE.CylinderGeometry(
+    DOT_RADIUS * 1.8,
+    DOT_RADIUS * 1.8,
+    DOT_HEIGHT * 2.5,
+    12,
+  );
+
+  const hoverProxyMaterial = new THREE.MeshBasicMaterial({ visible: false });
+
+  hoverProxyMesh = new THREE.InstancedMesh(
+    hoverProxyGeometry,
+    hoverProxyMaterial,
+    dots.length,
+  );
+
+  hoverProxyMesh.frustumCulled = false;
+  scene.add(hoverProxyMesh);
+
   const geometry = new THREE.CylinderGeometry(
     DOT_RADIUS * CONFIG.dotGeometry.topRadiusFactor,
     DOT_RADIUS,
@@ -276,14 +305,20 @@ function buildDotsFromFile(dots) {
       hotspotIndex: -1,
     };
 
-    dummy.position.set(x * SPACING, DOT_HEIGHT / 2, -y * SPACING);
+    dummy.position.set(
+      x * SPACING,
+      getCylinderCenterY(DOT_HEIGHT),
+      -y * SPACING,
+    );
     dummy.updateMatrix();
     dotMesh.setMatrixAt(i, dummy.matrix);
+    hoverProxyMesh.setMatrixAt(i, dummy.matrix);
   });
 
   dotMesh.instanceMatrix.needsUpdate = true;
   dotMesh.frustumCulled = false;
   dotMesh.castShadow = true;
+  hoverProxyMesh.instanceMatrix.needsUpdate = true;
 
   scene.add(dotMesh);
   // --- Build hotspot dots (BY TYPE) ---
@@ -346,7 +381,13 @@ function buildDotsFromFile(dots) {
       });
 
       const p = dotPositions[bestIndex];
-      dummy.position.set(p.x * SPACING, CONFIG.dots.height / 2, -p.y * SPACING);
+      const hotspotHeight =
+        CONFIG.dots.height * CONFIG.hotspots.heightMultiplier;
+      dummy.position.set(
+        p.x * SPACING,
+        getCylinderCenterY(hotspotHeight),
+        -p.y * SPACING,
+      );
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     });
@@ -360,14 +401,20 @@ function buildDotsFromFile(dots) {
   });
 }
 
+// Sync hotspot positions with dot lifts (called every frame)
 function syncHotspotLift() {
   const dummy = new THREE.Object3D();
 
   hotspotData.forEach((hs) => {
     const p = dotPositions[hs.dotIndex];
     const mesh = hotspotMeshes[hs.meshType];
+    const hotspotHeight = CONFIG.dots.height * CONFIG.hotspots.heightMultiplier;
 
-    dummy.position.set(p.x * SPACING, DOT_HEIGHT / 2 + p.lift, -p.y * SPACING);
+    dummy.position.set(
+      p.x * SPACING,
+      getCylinderCenterY(hotspotHeight, p.lift),
+      -p.y * SPACING,
+    );
     dummy.updateMatrix();
 
     mesh.setMatrixAt(hs.meshInstanceId, dummy.matrix);
@@ -385,10 +432,10 @@ let hoveredInstanceId = null;
 let hoverCooldown = 0;
 
 function handleHover() {
-  if (!dotMesh) return;
+  if (!dotMesh || !hoverProxyMesh) return;
 
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObject(dotMesh);
+  const hits = raycaster.intersectObject(hoverProxyMesh);
 
   // Small hysteresis to prevent flicker
   if (hits.length) {
@@ -507,15 +554,19 @@ function smoothLiftUpdate() {
 
       dummy.position.set(
         p.x * SPACING,
-        DOT_HEIGHT / 2 + p.lift,
+        getCylinderCenterY(DOT_HEIGHT, p.lift),
         -p.y * SPACING,
       );
       dummy.updateMatrix();
       dotMesh.setMatrixAt(i, dummy.matrix);
+      hoverProxyMesh.setMatrixAt(i, dummy.matrix);
     }
   });
 
-  if (dirty) dotMesh.instanceMatrix.needsUpdate = true;
+  if (dirty) {
+    dotMesh.instanceMatrix.needsUpdate = true;
+    hoverProxyMesh.instanceMatrix.needsUpdate = true;
+  }
 }
 
 // ================= LOOP =================
