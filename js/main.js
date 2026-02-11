@@ -96,6 +96,12 @@ const CONFIG = {
       heightRatio: 0.5, // relative to top radius (smaller = subtler dome)
       segments: 8,
     },
+    connectionLine: {
+      enabled: true,
+      color: 0x5a5a5a,
+      opacity: 0.55,
+      heightOffset: 0,
+    },
 
     material: {
       roughness: 0.3,
@@ -493,13 +499,47 @@ function buildDotsFromFile(dots) {
     hotspotMeshes[type] = mesh;
     scene.add(mesh);
   });
+
+  buildHotspotConnectionLine();
+}
+
+function buildHotspotConnectionLine() {
+  if (!CONFIG.hotspots.connectionLine?.enabled || hotspotData.length === 0) {
+    return;
+  }
+
+  const hotspotHeight = CONFIG.dots.height * CONFIG.hotspots.heightMultiplier;
+  const positions = new Float32Array(hotspotData.length * 3);
+
+  hotspotData.forEach((hs, i) => {
+    const p = dotPositions[hs.dotIndex];
+    positions[i * 3] = p.x * SPACING;
+    positions[i * 3 + 1] =
+      getCylinderCenterY(hotspotHeight, p.lift) +
+      CONFIG.hotspots.connectionLine.heightOffset;
+    positions[i * 3 + 2] = -p.y * SPACING;
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const material = new THREE.LineBasicMaterial({
+    color: CONFIG.hotspots.connectionLine.color,
+    transparent: CONFIG.hotspots.connectionLine.opacity < 1,
+    opacity: CONFIG.hotspots.connectionLine.opacity,
+  });
+
+  hotspotLine = new THREE.Line(geometry, material);
+  hotspotLine.frustumCulled = false;
+  scene.add(hotspotLine);
 }
 
 // Sync hotspot positions with dot lifts (called every frame)
 function syncHotspotLift() {
   const dummy = new THREE.Object3D();
+  const linePositions = hotspotLine?.geometry?.attributes?.position;
 
-  hotspotData.forEach((hs) => {
+  hotspotData.forEach((hs, i) => {
     const p = dotPositions[hs.dotIndex];
     const mesh = hotspotMeshes[hs.meshType];
     const hotspotHeight = CONFIG.dots.height * CONFIG.hotspots.heightMultiplier;
@@ -512,16 +552,27 @@ function syncHotspotLift() {
     dummy.updateMatrix();
 
     mesh.setMatrixAt(hs.meshInstanceId, dummy.matrix);
+
+    if (linePositions) {
+      linePositions.array[i * 3 + 1] =
+        getCylinderCenterY(hotspotHeight, p.lift) +
+        CONFIG.hotspots.connectionLine.heightOffset;
+    }
   });
 
   Object.values(hotspotMeshes).forEach((mesh) => {
     mesh.instanceMatrix.needsUpdate = true;
   });
+
+  if (linePositions) {
+    linePositions.needsUpdate = true;
+  }
 }
 
 // ================= HOTSPOT DOTS =================
 let hotspotMeshes = {};
 let hotspotData = [];
+let hotspotLine = null;
 
 // ================= HOVER =================
 
