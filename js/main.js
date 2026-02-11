@@ -99,9 +99,9 @@ const CONFIG = {
     connectionLine: {
       enabled: true,
       color: 0x5a5a5a,
-      opacity: 0.55,
+      opacity: 0.75,
       heightOffset: 0,
-      arcHeight: 4.95, // world units
+      arcHeight: 4, // world units
       segments: 50, // points per hotspot segment
     },
 
