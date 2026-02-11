@@ -1,0 +1,9 @@
+[
+  {
+    "id": "cheltenham-ai",
+    "label": "Cheltenham AI Node",
+    "message": "In test operation\nServing Worldwide\nNode capacity: 1,000,000 DAU (@1% concurrency 10,000 users)",
+    "lat": 80.5456,
+    "lon": 1.0783
+  }
+]
