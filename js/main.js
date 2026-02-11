@@ -107,7 +107,7 @@ const CONFIG = {
       radialSegments: 6,
     },
     connectionPairs: [
-      { fromId: "johannesburg", toId: "singapore" },
+      { fromId: "johannesburg", toId: "singapore" }, // You can add overrides right in the pair object
     ],
 
     material: {
