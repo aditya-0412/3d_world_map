@@ -103,6 +103,8 @@ const CONFIG = {
       heightOffset: 0,
       arcHeight: 4, // world units
       segments: 50, // points per hotspot segment
+      thickness: 0.02, // world units
+      radialSegments: 6,
     },
 
     material: {
@@ -190,15 +192,12 @@ function getHotspotWorldPosition(hs, out) {
   );
 }
 
-function updateHotspotConnectionLine() {
-  if (!hotspotLine) return;
-
+function collectHotspotArcPoints() {
   const lineCfg = CONFIG.hotspots.connectionLine;
   const segments = Math.max(1, Math.floor(lineCfg.segments));
-  const linePositions = hotspotLine.geometry.attributes.position;
+  const points = [];
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
-  let writeIndex = 0;
 
   for (let i = 0; i < hotspotData.length - 1; i += 1) {
     getHotspotWorldPosition(hotspotData[i], a);
@@ -208,17 +207,42 @@ function updateHotspotConnectionLine() {
     for (let s = start; s <= segments; s += 1) {
       const t = s / segments;
       const oneMinus = 1 - t;
-      linePositions.array[writeIndex++] = a.x * oneMinus + b.x * t;
-      linePositions.array[writeIndex++] =
-        a.y * oneMinus +
-        b.y * t +
-        Math.sin(Math.PI * t) * lineCfg.arcHeight;
-      linePositions.array[writeIndex++] = a.z * oneMinus + b.z * t;
+      points.push(
+        new THREE.Vector3(
+          a.x * oneMinus + b.x * t,
+          a.y * oneMinus +
+            b.y * t +
+            Math.sin(Math.PI * t) * lineCfg.arcHeight,
+          a.z * oneMinus + b.z * t,
+        ),
+      );
     }
   }
 
-  linePositions.needsUpdate = true;
-  hotspotLine.geometry.computeBoundingSphere();
+  return points;
+}
+
+function updateHotspotConnectionLine() {
+  if (!hotspotLine) return;
+
+  const lineCfg = CONFIG.hotspots.connectionLine;
+  const points = collectHotspotArcPoints();
+  if (points.length < 2) return;
+
+  const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
+  const tubularSegments = Math.max(2, points.length * 2);
+  const radius = Math.max(0.001, lineCfg.thickness);
+  const radialSegments = Math.max(3, Math.floor(lineCfg.radialSegments));
+  const nextGeometry = new THREE.TubeGeometry(
+    curve,
+    tubularSegments,
+    radius,
+    radialSegments,
+    false,
+  );
+
+  hotspotLine.geometry.dispose();
+  hotspotLine.geometry = nextGeometry;
 }
 
 // ================= HOTSPOTS =================
@@ -555,26 +579,31 @@ function buildHotspotConnectionLine() {
     return;
   }
 
-  const segments = Math.max(
-    1,
-    Math.floor(CONFIG.hotspots.connectionLine.segments),
+  const lineCfg = CONFIG.hotspots.connectionLine;
+  const points = collectHotspotArcPoints();
+  if (points.length < 2) return;
+
+  const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
+  const tubularSegments = Math.max(2, points.length * 2);
+  const radius = Math.max(0.001, lineCfg.thickness);
+  const radialSegments = Math.max(3, Math.floor(lineCfg.radialSegments));
+  const geometry = new THREE.TubeGeometry(
+    curve,
+    tubularSegments,
+    radius,
+    radialSegments,
+    false,
   );
-  const pointCount = (hotspotData.length - 1) * segments + 1;
-  const positions = new Float32Array(pointCount * 3);
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-
-  const material = new THREE.LineBasicMaterial({
-    color: CONFIG.hotspots.connectionLine.color,
-    transparent: CONFIG.hotspots.connectionLine.opacity < 1,
-    opacity: CONFIG.hotspots.connectionLine.opacity,
+  const material = new THREE.MeshBasicMaterial({
+    color: lineCfg.color,
+    transparent: lineCfg.opacity < 1,
+    opacity: lineCfg.opacity,
   });
 
-  hotspotLine = new THREE.Line(geometry, material);
+  hotspotLine = new THREE.Mesh(geometry, material);
   hotspotLine.frustumCulled = false;
   scene.add(hotspotLine);
-  updateHotspotConnectionLine();
 }
 
 // Sync hotspot positions with dot lifts (called every frame)
