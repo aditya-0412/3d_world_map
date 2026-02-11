@@ -101,6 +101,8 @@ const CONFIG = {
       color: 0x5a5a5a,
       opacity: 0.55,
       heightOffset: 0,
+      arcHeight: 4.95, // world units
+      segments: 50, // points per hotspot segment
     },
 
     material: {
@@ -175,6 +177,48 @@ function createDomedCylinderGeometry(
   merged.computeVertexNormals();
   merged.translate(0, -domeHeight / 2, 0);
   return merged;
+}
+
+function getHotspotWorldPosition(hs, out) {
+  const p = dotPositions[hs.dotIndex];
+  const hotspotHeight = CONFIG.dots.height * CONFIG.hotspots.heightMultiplier;
+  out.set(
+    p.x * SPACING,
+    getCylinderCenterY(hotspotHeight, p.lift) +
+      CONFIG.hotspots.connectionLine.heightOffset,
+    -p.y * SPACING,
+  );
+}
+
+function updateHotspotConnectionLine() {
+  if (!hotspotLine) return;
+
+  const lineCfg = CONFIG.hotspots.connectionLine;
+  const segments = Math.max(1, Math.floor(lineCfg.segments));
+  const linePositions = hotspotLine.geometry.attributes.position;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  let writeIndex = 0;
+
+  for (let i = 0; i < hotspotData.length - 1; i += 1) {
+    getHotspotWorldPosition(hotspotData[i], a);
+    getHotspotWorldPosition(hotspotData[i + 1], b);
+
+    const start = i === 0 ? 0 : 1;
+    for (let s = start; s <= segments; s += 1) {
+      const t = s / segments;
+      const oneMinus = 1 - t;
+      linePositions.array[writeIndex++] = a.x * oneMinus + b.x * t;
+      linePositions.array[writeIndex++] =
+        a.y * oneMinus +
+        b.y * t +
+        Math.sin(Math.PI * t) * lineCfg.arcHeight;
+      linePositions.array[writeIndex++] = a.z * oneMinus + b.z * t;
+    }
+  }
+
+  linePositions.needsUpdate = true;
+  hotspotLine.geometry.computeBoundingSphere();
 }
 
 // ================= HOTSPOTS =================
@@ -504,21 +548,19 @@ function buildDotsFromFile(dots) {
 }
 
 function buildHotspotConnectionLine() {
-  if (!CONFIG.hotspots.connectionLine?.enabled || hotspotData.length === 0) {
+  if (
+    !CONFIG.hotspots.connectionLine?.enabled ||
+    hotspotData.length < 2
+  ) {
     return;
   }
 
-  const hotspotHeight = CONFIG.dots.height * CONFIG.hotspots.heightMultiplier;
-  const positions = new Float32Array(hotspotData.length * 3);
-
-  hotspotData.forEach((hs, i) => {
-    const p = dotPositions[hs.dotIndex];
-    positions[i * 3] = p.x * SPACING;
-    positions[i * 3 + 1] =
-      getCylinderCenterY(hotspotHeight, p.lift) +
-      CONFIG.hotspots.connectionLine.heightOffset;
-    positions[i * 3 + 2] = -p.y * SPACING;
-  });
+  const segments = Math.max(
+    1,
+    Math.floor(CONFIG.hotspots.connectionLine.segments),
+  );
+  const pointCount = (hotspotData.length - 1) * segments + 1;
+  const positions = new Float32Array(pointCount * 3);
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -532,14 +574,14 @@ function buildHotspotConnectionLine() {
   hotspotLine = new THREE.Line(geometry, material);
   hotspotLine.frustumCulled = false;
   scene.add(hotspotLine);
+  updateHotspotConnectionLine();
 }
 
 // Sync hotspot positions with dot lifts (called every frame)
 function syncHotspotLift() {
   const dummy = new THREE.Object3D();
-  const linePositions = hotspotLine?.geometry?.attributes?.position;
 
-  hotspotData.forEach((hs, i) => {
+  hotspotData.forEach((hs) => {
     const p = dotPositions[hs.dotIndex];
     const mesh = hotspotMeshes[hs.meshType];
     const hotspotHeight = CONFIG.dots.height * CONFIG.hotspots.heightMultiplier;
@@ -552,21 +594,13 @@ function syncHotspotLift() {
     dummy.updateMatrix();
 
     mesh.setMatrixAt(hs.meshInstanceId, dummy.matrix);
-
-    if (linePositions) {
-      linePositions.array[i * 3 + 1] =
-        getCylinderCenterY(hotspotHeight, p.lift) +
-        CONFIG.hotspots.connectionLine.heightOffset;
-    }
   });
 
   Object.values(hotspotMeshes).forEach((mesh) => {
     mesh.instanceMatrix.needsUpdate = true;
   });
 
-  if (linePositions) {
-    linePositions.needsUpdate = true;
-  }
+  updateHotspotConnectionLine();
 }
 
 // ================= HOTSPOT DOTS =================
